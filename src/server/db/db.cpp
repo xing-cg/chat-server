@@ -3,7 +3,7 @@
 /* 数据库配置信息 */
 static string server = "127.0.0.1";
 static string user = "root";
-static string password = "123456";
+static string password = "123";
 static string dbname = "chat";
 /* 初始化数据库连接 */
 MySQL::MySQL()
@@ -24,6 +24,11 @@ bool MySQL::connect()
     {
         /* C/C++代码默认的编码字符是ASCII，如果不设置，则从MySQL上拉下来的中文无法正常显示 */
         mysql_query(_conn, "set name gbk");
+        LOG_INFO << "connect mysql success!";
+    }
+    else
+    {
+        LOG_INFO << "connect mysql failed!";
     }
     return p;
 }
@@ -46,4 +51,9 @@ MYSQL_RES * MySQL::query(string sql)
         return nullptr;
     }
     return mysql_use_result(_conn);
+}
+/* 获取连接 */
+MYSQL * MySQL::getConnection()
+{
+    return _conn;
 }

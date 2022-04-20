@@ -48,5 +48,26 @@ void ChatService::login(const TcpConnectionPtr &conn,
 void ChatService::reg(const TcpConnectionPtr &conn,
                       json &js, Timestamp time)
 {
-    LOG_INFO << "do reg service.";
+    /* LOG_INFO << "do reg service."; */
+    string name = js["name"];
+    string password = js["password"];
+
+    User user;
+    user.setName(name);
+    user.setPassword(password);
+    bool state = _userModel.insert(user);
+    json response;
+    response["msgid"] = REG_MSG_ACK;
+    if(state)
+    {
+        /* 注册成功 */
+        response["errno"] = 0;
+        response["id"] = user.getId();
+    }
+    else
+    {
+        /* 注册失败 */
+        response["errno"] = 1;
+    }
+    conn->send(response.dump());
 }
