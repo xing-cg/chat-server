@@ -1,37 +1,99 @@
-# chat-server
+# 内容
 
-#### 介绍
-聊天服务器
+1. 项目需求及目标
+2. 开发环境
+3. Json介绍
+4. muduo网络库编程
+5. 服务器集群
+6. 基于发布-订阅的Redis——服务器中间件
+7. 数据库设计
 
-#### 软件架构
-软件架构说明
+本项目要用到的技术栈：
 
+1、Json序列化和反序列化；
 
-#### 安装教程
+2、muduo网络库开发；
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+3、nginx源码编译安装和环境部署；
 
-#### 使用说明
+4、nginx的tcp负载均衡器配置；
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+5、redis缓存服务器编程实践；
 
-#### 参与贡献
+6、基于发布-订阅的服务器中间件redis消息队列编程实践；
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+7、MySQL数据库编程；
 
+8、CMake构建编译环境；
 
-#### 特技
+9、Github托管项目
 
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+本项目的内容包含了：通常开发的服务器，网络、业务、数据模块（数据库、数据的操作），项目中要把三大模块区分开，项目初期时以登录模块为主线，分三大块推进。
+
+# 项目需求及目标
+
+* 项目需求
+  1. 客户端新用户注册
+  2. 客户端用户登录
+  3. 添加好友和添加群组
+  4. 好友聊天和群组聊天
+  5. nginx配置tcp负载均衡
+  6. 集群聊天系统支持客户端跨服务器通信
+
+* 项目目标
+  1. 掌握服务器的网络I/O模块，业务模块，数据模块分层的设计思想
+  2. 掌握C++ muduo网络库的编程以及实现原理
+  3. 掌握Json的编程应用
+  4. 掌握nginx配置部署tcp负载均衡器的原理及应用
+  5. 掌握服务器中间件的应用场景和基于发布-订阅的redis编程实践以及应用原理
+  6. 掌握CMake构建自动化编程环境
+
+# 开发环境
+
+具体配置略，翻阅其他文章。
+
+## 工程目录
+
+```
+include目录是头文件放的位置。
+server和client的代码在同一工程中，最后生成时可以把C/S分开生成到bin目录下。
+可按server和client分类，比如生成代码所需用到的头文件可以分别放在/include/server和/include/client，而server和client共需的头文件直接放到/include下。比如消息的id。
+src放源码。
+thirdparty是第三方库文件夹，比如放json.hpp。
+本项目没有生成lib库(.a/.so)，所以没有lib文件夹。
+```
+
+# Json介绍
+
+Json是一种轻量级的数据交换格式（也叫数据序列化方式）。Json采用完全**独立于编程语言**的文本格式
+来存储和表示数据。简洁和清晰的层次结构使得 Json成为理想的数据交换语言。 易于人阅读和编写，同时也易于机器解析和生成，并有效地提升网络传输效率。
+
+* Json第三方库
+
+本项目选用的是JSON for Modern C++，由德国人nlohmann编写的在C++下使用的JSON库。
+
+特点：
+
+1、整个代码由一个头文件json.hpp包含，没有依赖关系，使用方便；
+
+2、使用C++11标准编写；
+
+3、使得json像STL容器一样，而且STL和json容器之间可以相互转换；
+
+4、所有类都经过严格的单元测试，覆盖100％的代码，包括所有特殊的行为。此外，还检查了Valgrind是否有内存泄漏。为了保持高质量，该项目遵循“核心基础设施”倡议的最佳实践。
+
+# Reactor模型
+
+本项目基于muduo库，模型是基于事件驱动的、IO复用+epoll+线程池的网络，完全基于Reactor模型，线程暂时设置为4个，有一个主Reactor是IO线程，主要负责新用户的连接，3个sub-Reactor是工作线程，主要负责已连接用户的读写事件的处理。
+
+# 数据模块
+
+## ORM框架
+
+Object Relation Map - 对象关系映射。
+
+在这个框架中，业务层操作的都是对象，看不到具体的SQL操作。
+
+在DAO层（数据层），才有具体的数据库操作。
+
+解决了痛点：业务模块、数据模块之间的解耦。

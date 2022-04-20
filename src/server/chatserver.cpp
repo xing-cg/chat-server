@@ -1,5 +1,6 @@
 #include"chatserver.hpp"
-#include"../thirdparty/json.hpp"
+#include"json.hpp"
+#include"chatservice.hpp"
 #include<functional>
 #include<string>
 
@@ -7,8 +8,8 @@ using namespace std;
 using namespace placeholders;
 using json = nlohmann::json;
 ChatServer::ChatServer(EventLoop* loop,
-               const InetAddress& listenAddr,
-               const string& nameArg)
+                       const InetAddress& listenAddr,
+                       const string& nameArg)
     : _server(loop, listenAddr, nameArg), _loop(loop)
 {
     /* 注册连接回调 */
@@ -31,12 +32,12 @@ void ChatServer::start()
 void ChatServer::onConnection(const TcpConnectionPtr&conn)
 {
     /* 客户端断开连接 */
-    if(!conn->connected())conn->shutdown();
+    if(!conn->connected())conn->shutdown(); //释放socketfd资源
 }
 /* 上报读写事件相关信息的回调函数*/
 void ChatServer::onMessage(const TcpConnectionPtr& conn,
-                        Buffer* buffer,
-                        Timestamp time)
+                           Buffer* buffer,
+                           Timestamp time)
 {
     /* muduo库或从网络上读取的数据首先在数据缓冲区，
      * 收到一个消息后，retrieveAllAsString可以把缓冲区的数据
@@ -52,4 +53,7 @@ void ChatServer::onMessage(const TcpConnectionPtr& conn,
      * 回调handler时，conn、js对象、time都可以传入。
      * 我们要达到的目的：完全解耦网络模块的代码和业务模块的代码
      */
+    auto msgHandler = ChatService::instance()->getHandler(js["msgid"].get<int>());  // js["msgid"] 依旧是json类型，需要转为int
+    /* 回调消息绑定好的事件处理器，来执行相应的业务处理 */
+    msgHandler(conn, js, time);
 }
