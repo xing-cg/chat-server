@@ -21,6 +21,7 @@ ChatService::ChatService()
     _msgHandlerMap.insert({LOGIN_MSG, std::bind(&ChatService::login, this, _1, _2, _3)});
     _msgHandlerMap.insert({REG_MSG, std::bind(&ChatService::reg, this, _1, _2, _3)});
     _msgHandlerMap.insert({ONE_CHAT_MSG, std::bind(&ChatService::oneChat, this, _1, _2, _3)});
+    _msgHandlerMap.insert({ADD_FRIEND_MSG, std::bind(&ChatService::addFriend, this, _1, _2, _3)});
 }
 /* 业务重置方法，通常在服务器异常退出时调用 */
 void ChatService::reset()
@@ -84,12 +85,27 @@ void ChatService::login(const TcpConnectionPtr &conn,
             response["id"] = user.getId();
             response["name"] = user.getName();
             /* 查询该用户是否在离线时未收到的消息 */
-            vector<string> vec = _offlineMsgModel.query(id);
-            if(!vec.empty())
+            vector<string> offlineMsgVec = _offlineMsgModel.query(id);
+            if(!offlineMsgVec.empty())
             {
-                response["offlinemsg"] = vec;
+                response["offlinemsg"] = offlineMsgVec;
                 /* 把该用户的所有离线消息从从数据中删除掉 */
                 _offlineMsgModel.remove(id);
+            }
+            /* 查询该用户的好友信息，并返回 */
+            vector<User> userVec = _friendModel.query(id);
+            if(!userVec.empty())
+            {
+                vector<string> friendJsonInfoVec;
+                for(User &user : userVec)
+                {
+                    json js;
+                    js["id"] = user.getId();
+                    js["name"] = user.getName();
+                    js["state"] = user.getState();
+                    friendJsonInfoVec.push_back(js.dump());
+                }
+                response["friends"] = friendJsonInfoVec;
             }
         }
     }
@@ -174,4 +190,13 @@ void ChatService::oneChat(const TcpConnectionPtr &conn, json &js, Timestamp time
     }
     /* 接收方离线，存储离线消息 */
     _offlineMsgModel.insert(to, js.dump());
+}
+/* 添加好友业务 */
+void ChatService::addFriend(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int friendid = js["friendid"].get<int>();
+
+    /* 存储好友信息 -> include"friendmodel.hpp" */
+    _friendModel.insert(userid, friendid);
 }
