@@ -32,7 +32,11 @@ void ChatServer::start()
 void ChatServer::onConnection(const TcpConnectionPtr&conn)
 {
     /* 客户端断开连接 */
-    if(!conn->connected())conn->shutdown(); //释放socketfd资源
+    if(!conn->connected())
+    {
+        ChatService::instance()->clientCloseException(conn);
+        conn->shutdown(); //释放socketfd资源
+    }
 }
 /* 上报读写事件相关信息的回调函数*/
 void ChatServer::onMessage(const TcpConnectionPtr& conn,
