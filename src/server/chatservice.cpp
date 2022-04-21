@@ -60,6 +60,11 @@ void ChatService::login(const TcpConnectionPtr &conn,
         else if(user.getState() == "offline")
         {
             /* 登陆成功 */
+            {
+                /* 记录用户连接信息 */
+                lock_guard<mutex> lock(_connMutex);
+                _userConnectionMap.insert({id, conn});
+            }
             /* 更新用户状态信息 */
             user.setState("online");
             _userModel.updateState(user);
