@@ -5,6 +5,7 @@
 #include<functional>
 
 #include"usermodel.hpp"
+#include"offlinemsgmodel.hpp"
 
 using namespace std;
 using namespace muduo;
@@ -45,5 +46,7 @@ private:
     mutex _connMutex;
     /* 数据操作类对象 */
     UserModel _userModel;
+    /*  */
+    OfflineMsgModel _offlineMsgModel;
 };
 #endif

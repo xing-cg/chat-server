@@ -2,6 +2,10 @@
 #include"public.hpp"
 #include<muduo/base/Logging.h>  // LOG_ERROR <<
 using namespace muduo;
+
+#include<vector>
+using namespace std;
+
 ChatService* ChatService::instance()
 {
     static ChatService service;
@@ -73,6 +77,14 @@ void ChatService::login(const TcpConnectionPtr &conn,
             response["errno"] = LOGIN_SUCCEESS;
             response["id"] = user.getId();
             response["name"] = user.getName();
+            /* 查询该用户是否在离线时未收到的消息 */
+            vector<string> vec = _offlineMsgModel.query(id);
+            if(!vec.empty())
+            {
+                response["offlinemsg"] = vec;
+                /* 把该用户的所有离线消息从从数据中删除掉 */
+                _offlineMsgModel.remove(id);
+            }
         }
     }
     else if(user.getId() != id)
@@ -155,4 +167,5 @@ void ChatService::oneChat(const TcpConnectionPtr &conn, json &js, Timestamp time
         }
     }
     /* 接收方离线，存储离线消息 */
+    _offlineMsgModel.insert(to, js.dump());
 }
