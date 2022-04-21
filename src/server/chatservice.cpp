@@ -42,7 +42,46 @@ MsgHandler ChatService::getHandler(int msgid)
 void ChatService::login(const TcpConnectionPtr &conn,
                         json &js, Timestamp time)
 {
-    LOG_INFO << "do login service.";
+    /* 从json参数获取账号、密码信息 */
+    int id = js["id"].get<int>();
+    string password = js["password"];
+    User user = _userModel.query(id);
+
+    json response;
+    response["msgid"] = LOGIN_MSG_ACK;
+    if(user.getId() == id && user.getPassword() == password)
+    {
+        if(user.getState() == "online")
+        {
+            /* 该用户已经登录在线，不允许重复登陆 */
+            response["errno"] = LOGIN_REPEAT;
+            response["errmsg"] = "该用户已经登录";
+        }
+        else if(user.getState() == "offline")
+        {
+            /* 登陆成功 */
+            /* 更新用户状态信息 */
+            user.setState("online");
+            _userModel.updateState(user);
+
+            response["errno"] = LOGIN_SUCCEESS;
+            response["id"] = user.getId();
+            response["name"] = user.getName();
+        }
+    }
+    else if(user.getId() != id)
+    {
+        /* 登录失败，用户不存在 */
+        response["errno"] = LOGIN_NOTFOUND;
+        response["errmsg"] = "用户不存在";
+    }
+    else if(user.getPassword() != password)
+    {
+        /* 登录失败，密码不匹配 */
+        response["errno"] = LOGIN_WRONGPWD;
+        response["errmsg"] = "密码验证失败";
+    }
+    conn->send(response.dump());
 }
 /* 处理注册业务 */
 void ChatService::reg(const TcpConnectionPtr &conn,
