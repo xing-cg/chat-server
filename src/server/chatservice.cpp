@@ -200,3 +200,53 @@ void ChatService::addFriend(const TcpConnectionPtr &conn, json &js, Timestamp ti
     /* 存储好友信息 -> include"friendmodel.hpp" */
     _friendModel.insert(userid, friendid);
 }
+
+/* 创建群组业务 */
+void ChatService::createGroup(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    string groupName = js["groupname"];
+    string groupDesc = js["groupdesc"];
+
+    /* 存储新创建的群组信息 */
+    Group group(-1, groupName, groupDesc);
+    if(_groupModel.createGroup(group))
+    {
+        /* 把创建人加入群组 */
+        _groupModel.addGroup(userid, group.getId(), "Creator");
+    }
+}
+/* 加入群组业务 */
+void ChatService::addGroup(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int groupid = js["groupid"].get<int>();
+    _groupModel.addGroup(userid, groupid, "Normal");
+}
+/* 群组聊天业务 */
+void ChatService::groupChat(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int groupid = js["groupid"].get<int>();
+    vector<int> useridVec = _groupModel.queryGroupUsers(userid, groupid);
+
+    bool online = false;
+    for(int id : useridVec)
+    {
+        {
+            lock_guard<mutex> lock(_connMutex);
+            auto it = _userConnectionMap.find(id);
+            if(it != _userConnectionMap.end())
+            {
+                online = true;
+                it->second->send(js.dump());
+            }
+        }
+        if(!online)
+        {
+            /* 存储离线群消息 */
+            _offlineMsgModel.insert(id, js.dump());
+        }
+        online = false;
+    }
+}
