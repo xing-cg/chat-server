@@ -11,7 +11,8 @@ ChatService* ChatService::instance()
     static ChatService service;
     return &service;
 }
-/* 注册消息以及对应的Handler回调操作
+/**
+ * 注册消息以及对应的Handler回调操作
  * 对unordered_map成员变量进行初始化
  * 这是业务模块的核心，也是对项目进行解耦的核心
  */
