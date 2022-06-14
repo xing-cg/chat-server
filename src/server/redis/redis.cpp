@@ -102,10 +102,7 @@ bool Redis::unsubscribe(int channel)
             return false;
         }
     }
-    /**
-     * 这里不做redisReply的操作,
-     * 这是个阻塞的操作, 放在observer_channel_message中做;
-     */
+
     return true;
 }
 /**
@@ -150,4 +147,3 @@ void Redis::init_notify_handler(MessageCallback cb)
  *  4. 由于publish操作一般不会阻塞, 所以直接调用redisCommand;
  *  5. 由于subscribe操作最后的redisGetReply将会阻塞, 所以我们把这几个步骤单独写出来, 粒度减小, 追求效率;
  */
-

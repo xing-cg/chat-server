@@ -1,3 +1,5 @@
 # Build and Release Folders
 [Bb]in/
-[Bb]uild
+[Bb]uild/
+# vscode Folder
+.vscode

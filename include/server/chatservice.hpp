@@ -4,6 +4,8 @@
 #include<unordered_map>
 #include<functional>
 
+#include"redis.hpp"
+
 #include"usermodel.hpp"
 #include"offlinemsgmodel.hpp"
 #include"friendmodel.hpp"
@@ -55,6 +57,11 @@ public:
 public:
     /* 业务重置方法，通常在服务器异常退出时调用 */
     void reset();
+#ifdef __CLUSTER__
+public:
+    /* 从Redis消息队列中获取订阅的消息 */
+    void handleRedisSubscribeMessage(int channel, string message);
+#endif
 
 private:
     ChatService();
@@ -71,5 +78,10 @@ private:
     unordered_map<int, MsgHandler> _msgHandlerMap;
     /* 存储在线用户的通信连接 */
     unordered_map<int, TcpConnectionPtr> _userConnectionMap;
+#ifdef __CLUSTER__
+private:
+    /* redis操作对象 */
+    Redis m_redis;
+#endif
 };
 #endif

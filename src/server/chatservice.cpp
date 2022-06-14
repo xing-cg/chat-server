@@ -1,6 +1,7 @@
 #include"chatservice.hpp"
 #include"public.hpp"
 #include<muduo/base/Logging.h>  // LOG_ERROR <<
+
 using namespace muduo;
 
 #include<vector>
@@ -23,6 +24,13 @@ ChatService::ChatService()
     _msgHandlerMap.insert({REG_MSG, std::bind(&ChatService::reg, this, _1, _2, _3)});
     _msgHandlerMap.insert({ONE_CHAT_MSG, std::bind(&ChatService::oneChat, this, _1, _2, _3)});
     _msgHandlerMap.insert({ADD_FRIEND_MSG, std::bind(&ChatService::addFriend, this, _1, _2, _3)});
+#ifdef __CLUSTER__
+    if(m_redis.connect())
+    {
+        m_redis.init_notify_handler(std::bind(
+            &ChatService::handleRedisSubscribeMessage, this, _1, _2));
+    }
+#endif
 }
 /* 业务重置方法，通常在服务器异常退出时调用 */
 void ChatService::reset()
@@ -78,6 +86,12 @@ void ChatService::login(const TcpConnectionPtr &conn,
                 lock_guard<mutex> lock(_connMutex);
                 _userConnectionMap.insert({id, conn});
             }
+#ifdef __CLUSTER__
+            /**
+             * 集群环境下, 向redis订阅此id 
+             */
+            m_redis.subscribe(id);
+#endif
             /* 更新用户状态信息 */
             user.setState("online");
             _userModel.updateState(user);
@@ -167,6 +181,12 @@ void ChatService::clientCloseException(const TcpConnectionPtr & conn)
             break;
         }
     }
+#ifdef __CLUSTER__
+    /**
+     * 集群环境下, 向redis取消订阅此id
+     */
+    m_redis.unsubscribe(user.getId());
+#endif
     /* 更新用户的状态信息 */
     if(user.getId() != -1)
     {
@@ -189,6 +209,18 @@ void ChatService::oneChat(const TcpConnectionPtr &conn, json &js, Timestamp time
             return;
         }
     }
+#ifdef __CLUSTER__
+    /**
+     * 集群环境下, 需要查询对方(to)是否在线;
+     * 不可通过服务器connMap查询, 是通过数据库信息;
+     */
+    User user = _userModel.query(to);
+    if(user.getState() == "online")
+    {
+        m_redis.publish(to, js.dump());
+        return;
+    }
+#endif
     /* 接收方离线，存储离线消息 */
     _offlineMsgModel.insert(to, js.dump());
 }
@@ -231,23 +263,62 @@ void ChatService::groupChat(const TcpConnectionPtr &conn, json &js, Timestamp ti
     int groupid = js["groupid"].get<int>();
     vector<int> useridVec = _groupModel.queryGroupUsers(userid, groupid);
 
-    bool online = false;
+    bool offline = true;
+    bool reallyOffline = true;
     for(int id : useridVec)
     {
         {
             lock_guard<mutex> lock(_connMutex);
             auto it = _userConnectionMap.find(id);
-            if(it != _userConnectionMap.end())
+            if(it != _userConnectionMap.end())//在本台服务器上线
             {
-                online = true;
+                offline = false;
+                reallyOffline = false;
                 it->second->send(js.dump());
             }
         }
-        if(!online)
+#ifdef __CLUSTER__
+        if(offline)
         {
-            /* 存储离线群消息 */
+            /**
+             * 集群环境下, 需要判断其是否在其他服务器上在线;
+             */
+            User user = _userModel.query(id);
+            if(user.getState() == "online")
+            {
+                reallyOffline = false;
+                m_redis.publish(id, js.dump());
+            }
+        }
+#endif
+        if(reallyOffline)
+        {
             _offlineMsgModel.insert(id, js.dump());
         }
-        online = false;
+        reallyOffline = true;
+        offline = true;
     }
 }
+#ifdef __CLUSTER__
+/**
+ * 场景: 本台服务器收到了redis某一频道发来的通知消息;
+ *  在前面的代码逻辑中, redis的publish都是判断用户在线之后才发的;
+ *   但是用户可能在这个判断和真正收到消息这段时间内下线,
+ *  所以, 本服务器处理收到redis某一频道上消息的回调时,
+ *   需要再次判断此id是否在线, 如果在线则发送, 
+ *   如果不在线, 需要存到离线消息数据库中; 
+ */
+void ChatService::handleRedisSubscribeMessage(int userid, string msg)
+{
+    lock_guard<mutex> lock(_connMutex);
+    auto it = _userConnectionMap.find(userid);
+    /* 该用户在线, 则直接发送 */
+    if(it != _userConnectionMap.end())
+    {
+        it->second->send(msg);
+        return;
+    }
+    /* 存储该用户的离线消息 */
+    _offlineMsgModel.insert(userid, msg);
+}
+#endif
